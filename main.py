@@ -1,5 +1,5 @@
 from PIL import Image, ImageOps, ImageFilter, ImageEnhance
-from pytesseract import Output, image_to_osd
+from pytesseract import Output, image_to_osd, image_to_data, image_to_string
 import os.path
 
 source_dir = "samples" # samples/1914/09/06/002-00.jpg
@@ -32,6 +32,7 @@ for image_source in image_sources:
     count += 1
     image_path_parts = image_source.split('/')
     image_path_source = os.path.join(source_dir,image_source.strip())
+    image_file_name = image_path_parts[-1]
     image_exists = os.path.exists(image_path_source)
     if (image_exists):
         print("[INFO] Processing {}: {}".format(count, image_path_source))
@@ -43,6 +44,7 @@ for image_source in image_sources:
         # enhance and save image
         high_contrast_image = enhance_high_contrast(image)
         high_contrast_image.save(image_path_output)
+        #
         # reopen image and read osd
         # this re-opening of the new image from path is currently necessary as osd continues to fail when opening from PIL.
         # See: https://stackoverflow.com/questions/54047116/getting-an-error-when-using-the-image-to-osd-method-with-pytesseract
@@ -55,10 +57,25 @@ for image_source in image_sources:
             high_contrast_image.save(image_path_output)
             # apply to original
             image = image.rotate(osd_results["orientation"], expand=1)
-        high_contrast_image.close()
+        #
         # enhance original for readability and close
+        print("[INFO] Enhancing original image")
         image = enhance_readable(image)
         image.save(image_path_source)
         image.close()
+        #
+        # read string and data from image
+        print("[INFO] Reading string from file")
+        image_string_file = open(os.path.join(dir_path_output,image_file_name[:-4]+".txt"), "w")
+        image_string_file.write(image_to_string(high_contrast_image))
+        image_string_file.close()
+        #
+        # read string and data from image
+        print("[INFO] Reading data from file")
+        image_data_file = open(os.path.join(dir_path_output,image_file_name[:-4]+".tsv"), "w")
+        image_data_file.write(image_to_data(high_contrast_image))
+        image_data_file.close()
+        # cleanup
+        high_contrast_image.close()
     else:
         print("[ERROR] Line {}: {} could NOT be found.".format(count, image_path_source))
