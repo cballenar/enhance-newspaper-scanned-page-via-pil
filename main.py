@@ -6,6 +6,8 @@ import json
 source_dir = "samples" # samples/1914/09/06/002-00.jpg
 output_dir = "output"
 
+user_words_path = "./training-data/user.lstm-word-dawg"
+
 # Profile 5: High Contrast
 def enhance_high_contrast(image):
     image = ImageOps.grayscale(image)
@@ -58,16 +60,19 @@ for image_source in image_sources:
             # apply to original
             image = image.rotate(osd_results["orientation"], expand=1)
         #
+        # Build config if available
+        tess_config = '--user-words {}'.format(user_words_path) if user_words_path else ''
+        #
         # read string and data from image
         print("[INFO] Reading string from file")
         image_string_file = open(os.path.join(dir_path_output,image_file_name[:-4]+"txt"), "w")
-        image_string_file.write(image_to_string(high_contrast_image, lang='spa'))
+        image_string_file.write(image_to_string(high_contrast_image, lang='spa', config=tess_config))
         image_string_file.close()
         #
         # read string and data from image
         print("[INFO] Reading data from file")
         image_data_file = open(os.path.join(dir_path_output,image_file_name[:-4]+"json"), "w")
-        image_data_file.write(json.dumps(image_to_data(high_contrast_image, lang='spa', output_type=Output.DICT)))
+        image_data_file.write(json.dumps(image_to_data(high_contrast_image, lang='spa', output_type=Output.DICT, config=tess_config)))
         image_data_file.close()
         # cleanup
         high_contrast_image.close()
