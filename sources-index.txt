@@ -1,0 +1,3 @@
+path/to/image.jpg
+path/to/other/image.jpg
+path/to/yet/another/image.jpg
