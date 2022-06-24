@@ -10,17 +10,17 @@ user_words_path = "./training-data/user.lstm-word-dawg"
 
 # Profile 5: High Contrast
 def enhance_high_contrast(image):
+    image = image.filter(ImageFilter.UnsharpMask(15,200,18))
+    image = ImageOps.autocontrast(image, (17,81))
     image = ImageOps.grayscale(image)
-    image = ImageOps.autocontrast(image, (25,60))
-    image = image.filter(ImageFilter.UnsharpMask(2,150,3))
     return image
 
 # Profile 6: Readable
 def enhance_readable(image):
-    image = ImageEnhance.Color(image).enhance(0.2)
-    image = ImageOps.autocontrast(image, (10,30))
     image = image.filter(ImageFilter.GaussianBlur(1))
     image = image.filter(ImageFilter.UnsharpMask(2,150,3))
+    image = ImageOps.autocontrast(image, (10,30))
+    image = ImageEnhance.Color(image).enhance(0.2)
     return image
 
 # Get list of images
