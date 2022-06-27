@@ -30,6 +30,14 @@ This script assumes some basic knowledge of python and execution of scripts from
 1. Run the script `python main.py`.
 1. Results will be printed as it progresses. All the images and read texts will be exported to the `./output` directory mirroring the path structure in source.
 
+### Enable/Disable Processes
+The following variables are available to enable/disable processes as needed. This all default to True.
+
+- `do_rotate` - Performs OSD and image rotation.
+- `do_text_extraction` - Performs `image_to_text` function and creation of `.txt` file.
+- `do_text_data_extraction` - Performs `image_to_data` function and creation of `.json` file.
+- `do_make_human_readable` - Applies Human Readable enhancement profile and overwrites image used for rotation. Disabling this will only output the high contrast grayscale image.
+
 ### Script Variables
 - `source_dir` - Defaults to `./source`.
 - `output_dir` - Defaults to `./output`. 
