@@ -38,7 +38,7 @@ def enhance_readable(image):
 # TODO: Program gathering of index by searching for files in the source directory
 sources_index_file = open(sources_index_path, 'r')
 sources_index = sources_index_file.readlines()
-  
+
 count = 0
 # Strips the newline character
 for image_source in sources_index:
@@ -60,19 +60,23 @@ for image_source in sources_index:
         #
         # Perform Rotation if requested
         if do_rotate:
-            # ! To fix: Reopen image and read osd
-            # this re-opening of the new image from path is currently necessary as osd continues to fail when opening from PIL.
-            # See: https://stackoverflow.com/questions/54047116/getting-an-error-when-using-the-image-to-osd-method-with-pytesseract
-            osd_results = image_to_osd(image_path_output, output_type=Output.DICT)
-            print("[INFO] Orientation: {} with a {} confidence.".format(osd_results["orientation"],osd_results["orientation_conf"]))
-            # If rotation seems good, apply and resave
-            if (osd_results["orientation_conf"]>0.75):
-                print("[INFO] Rotating...")
-                # apply to high contrast image
-                high_contrast_image = high_contrast_image.rotate(osd_results["orientation"], expand=1)
-                high_contrast_image.save(image_path_output)
-                # apply to original
-                image = image.rotate(osd_results["orientation"], expand=1)
+            try:
+                # ! To fix: Reopen image and read osd
+                # this re-opening of the new image from path is currently necessary as osd continues to fail when opening from PIL.
+                # See: https://stackoverflow.com/questions/54047116/getting-an-error-when-using-the-image-to-osd-method-with-pytesseract
+                osd_results = image_to_osd(image_path_output, output_type=Output.DICT)
+            except Exception as e:
+                print(e)
+            else:
+                print("[INFO] Orientation: {} with a {} confidence.".format(osd_results["orientation"],osd_results["orientation_conf"]))
+                # If rotation seems good, apply and resave
+                if (osd_results["orientation_conf"]>0.75):
+                    print("[INFO] Rotating...")
+                    # apply to high contrast image
+                    high_contrast_image = high_contrast_image.rotate(osd_results["orientation"], expand=1)
+                    high_contrast_image.save(image_path_output)
+                    # apply to original
+                    image = image.rotate(osd_results["orientation"], expand=1)
         #
         # read string and data from image
         if do_text_extraction:
