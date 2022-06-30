@@ -39,27 +39,17 @@ def enhance_readable(image):
     image = ImageEnhance.Color(image).enhance(0.2)
     return image
 
-# Get list of images
-# This can be gathered via `find -f . > image-sources.txt` and a cleanup
-# TODO: Program gathering of index by searching for files in the source directory
-sources_index_file = open(sources_index_path, 'r')
-sources_index = sources_index_file.readlines()
-
-logging.info("Starting a new batch...")
-
-count = 0
-# Strips the newline character
-for image_source in sources_index:
-    count += 1
-    image_path_parts = image_source.split('/')
-    image_path_source = os.path.join(source_dir,image_source.strip())
+# Process a Single Image from its path
+def process_image(image_path):
+    image_path_parts = image_path.split('/')
+    image_path_source = os.path.join(source_dir,image_path)
     image_file_name = image_path_parts[-1]
     image_exists = os.path.exists(image_path_source)
     if (image_exists):
         logging.info("Image {}: {}".format(count, image_path_source))
         image = Image.open(image_path_source)
         # build output path and directory
-        image_path_output = os.path.join(output_dir,image_source.strip())
+        image_path_output = os.path.join(output_dir,image_path)
         dir_path_output = os.path.join(output_dir,*image_path_parts[:-1])
         os.makedirs(dir_path_output, exist_ok=True)
         # enhance and save image
@@ -112,3 +102,17 @@ for image_source in sources_index:
         logging.info("Done.")
     else:
         logging.warning("Image {}: {} could NOT be found.".format(count, image_path_source))
+
+# Get list of images
+# This can be gathered via `find -f . > image-sources.txt` and a cleanup
+# TODO: Program gathering of index by searching for files in the source directory
+sources_index_file = open(sources_index_path, 'r')
+sources_index = sources_index_file.readlines()
+
+logging.info("Starting a new batch...")
+
+count = 0
+# Strips the newline character
+for sources_index_line in sources_index:
+    count += 1
+    process_image(sources_index_line.strip())
