@@ -1,8 +1,10 @@
 from PIL import Image, ImageOps, ImageFilter, ImageEnhance
 from pytesseract import Output, image_to_osd, image_to_data, image_to_string
 import os.path
+import logging
 import json
 
+# Script configuration
 source_dir = "source" # will be joined with the path in the sources index file
 output_dir = "output" # will mirror the paths in the sources index file
 
@@ -14,6 +16,10 @@ do_rotate = True
 do_text_extraction = True
 do_text_data_extraction = True
 do_make_human_readable = True # otherwise it will just save the "machine readable" (high contrast grayscale) image
+
+# Configure logs
+logging.basicConfig(filename="output.log",level=logging.INFO,format="%(asctime)s [%(levelname)s] %(message)s")
+logging.getLogger().addHandler(logging.StreamHandler())
 
 # Build config if available
 tess_config = '--user-words {}'.format(user_words_path) if user_words_path else ''
@@ -39,8 +45,7 @@ def enhance_readable(image):
 sources_index_file = open(sources_index_path, 'r')
 sources_index = sources_index_file.readlines()
 
-log_file = open("output.log", "a")
-log_file.write("\nStarting...")
+logging.info("Starting a new batch...")
 
 count = 0
 # Strips the newline character
@@ -51,8 +56,7 @@ for image_source in sources_index:
     image_file_name = image_path_parts[-1]
     image_exists = os.path.exists(image_path_source)
     if (image_exists):
-        print("[INFO] Image {}: {}".format(count, image_path_source))
-        log_file.write("\n[INFO] Image {}: {}".format(count, image_path_source))
+        logging.info("Image {}: {}".format(count, image_path_source))
         image = Image.open(image_path_source)
         # build output path and directory
         image_path_output = os.path.join(output_dir,image_source.strip())
@@ -70,16 +74,12 @@ for image_source in sources_index:
                 # See: https://stackoverflow.com/questions/54047116/getting-an-error-when-using-the-image-to-osd-method-with-pytesseract
                 osd_results = image_to_osd(image_path_output, output_type=Output.DICT)
             except Exception as e:
-                print(str(e))
-                log_file.write("\n")
-                log_file.write(str(e))
+                logging.error(str(e))
             else:
-                print("[INFO] Orientation: {} with a {} confidence.".format(osd_results["orientation"],osd_results["orientation_conf"]))
-                log_file.write("\n[INFO] Orientation: {} with a {} confidence.".format(osd_results["orientation"],osd_results["orientation_conf"]))
+                logging.info("Orientation: {} with a {} confidence.".format(osd_results["orientation"],osd_results["orientation_conf"]))
                 # If rotation seems good, apply and resave
                 if (osd_results["orientation_conf"]>0.75):
-                    print("[INFO] Rotating...")
-                    log_file.write("\n[INFO] Rotating...")
+                    logging.info("Rotating...")
                     # apply to high contrast image
                     high_contrast_image = high_contrast_image.rotate(osd_results["orientation"], expand=1)
                     high_contrast_image.save(image_path_output)
@@ -88,16 +88,14 @@ for image_source in sources_index:
         #
         # read string and data from image
         if do_text_extraction:
-            print("[INFO] Reading string from file...")
-            log_file.write("\n[INFO] Reading string from file...")
+            logging.info("Reading string from file...")
             image_string_file = open(os.path.join(dir_path_output,image_file_name[:-4]+"txt"), "w")
             image_string_file.write(image_to_string(high_contrast_image, lang=ocr_language, config=tess_config))
             image_string_file.close()
         #
         # read string and data from image
         if do_text_data_extraction:
-            print("[INFO] Reading data from file...")
-            log_file.write("\n[INFO] Reading data from file...")
+            logging.info("Reading data from file...")
             image_data_file = open(os.path.join(dir_path_output,image_file_name[:-4]+"json"), "w")
             image_data_file.write(json.dumps(image_to_data(high_contrast_image, lang=ocr_language, output_type=Output.DICT, config=tess_config)))
             image_data_file.close()
@@ -106,16 +104,11 @@ for image_source in sources_index:
         #
         # enhance original for readability, save as new output and close
         if do_make_human_readable:
-            print("[INFO] Enhancing original image...")
-            log_file.write("\n[INFO] Enhancing original image...")
+            logging.info("Enhancing original image...")
             image = enhance_readable(image)
             image.save(image_path_output)
         # final cleanup
         image.close()
-        print("[INFO] Done.\n")
-        log_file.write("\n[INFO] Done.\n")
+        logging.info("Done.")
     else:
-        print("[ERROR] Image {}: {} could NOT be found.\n".format(count, image_path_source))
-        log_file.write("\n[ERROR] Image {}: {} could NOT be found.\n".format(count, image_path_source))
-
-log_file.close()
+        logging.warning("Image {}: {} could NOT be found.".format(count, image_path_source))
