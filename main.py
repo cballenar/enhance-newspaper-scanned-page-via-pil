@@ -67,6 +67,20 @@ def detect_and_rotate_image(enhanced_image, output_path=os.path.join(output_dir,
                 return enhanced_image, source_image
     return enhanced_image, source_image
 
+def extract_text_from_image(image, output_path=os.path.join(output_dir,"tmp.txt")):
+    logging.info("Reading string from file...")
+    with open(output_path, "w") as image_string_file:
+        extracted_text = image_to_string(image, lang=ocr_language, config=tess_config)
+        image_string_file.write(extracted_text)
+    return extracted_text
+
+def extract_data_from_image(image, output_path=os.path.join(output_dir,"tmp.json")):
+    logging.info("Reading data from file...")
+    with open(output_path, "w") as image_data_file:
+        extracted_data = image_to_data(image, lang=ocr_language, output_type=Output.DICT, config=tess_config)
+        image_data_file.write(json.dumps(extracted_data))
+    return extracted_data
+
 # Process a Single Image from its path
 def process_image(image_path):
     image_path_parts = image_path.split('/')
@@ -76,10 +90,12 @@ def process_image(image_path):
     if (image_exists):
         logging.info("Image {}: {}".format(count, image_path_source))
         image = Image.open(image_path_source)
+        #
         # build output path and directory
         image_path_output = os.path.join(output_dir,image_path)
         dir_path_output = os.path.join(output_dir,*image_path_parts[:-1])
         os.makedirs(dir_path_output, exist_ok=True)
+        #
         # enhance and save image
         high_contrast_image = enhance_high_contrast(image)
         # 
@@ -87,28 +103,24 @@ def process_image(image_path):
         if do_rotate:
             high_contrast_image, image = detect_and_rotate_image(high_contrast_image, image_path_output, image)
         #
-        # read string and data from image
+        # read text from image
         if do_text_extraction:
-            logging.info("Reading string from file...")
-            image_string_file = open(os.path.join(dir_path_output,image_file_name[:-4]+"txt"), "w")
-            image_string_file.write(image_to_string(high_contrast_image, lang=ocr_language, config=tess_config))
-            image_string_file.close()
+            text_file_path = os.path.join(dir_path_output,image_file_name[:-4]+"txt")
+            extracted_text = extract_text_from_image(high_contrast_image, text_file_path)
         #
-        # read string and data from image
+        # read data from image
         if do_text_data_extraction:
-            logging.info("Reading data from file...")
-            image_data_file = open(os.path.join(dir_path_output,image_file_name[:-4]+"json"), "w")
-            image_data_file.write(json.dumps(image_to_data(high_contrast_image, lang=ocr_language, output_type=Output.DICT, config=tess_config)))
-            image_data_file.close()
-        # cleanup
-        high_contrast_image.close()
+            data_file_path = os.path.join(dir_path_output,image_file_name[:-4]+"json")
+            extracted_data = extract_data_from_image(high_contrast_image, data_file_path)
         #
-        # enhance original for readability, save as new output and close
+        # enhance original for readability and save as new output
         if do_make_human_readable:
             logging.info("Enhancing original image...")
             image = enhance_readable(image)
             image.save(image_path_output)
+        #
         # final cleanup
+        high_contrast_image.close()
         image.close()
         logging.info("Done.")
     else:
