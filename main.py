@@ -69,7 +69,7 @@ def detect_and_rotate_image(enhanced_image, output_path=os.path.join(output_dir,
             if source_image:
                 source_image = source_image.rotate(osd_results["orientation"], expand=1)
                 return enhanced_image, source_image
-    return enhanced_image, source_image
+    return enhanced_image
 
 def extract_text_from_image(image, output_path=os.path.join(output_dir,"tmp.txt")):
     logging.info("Reading string from file...")
