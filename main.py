@@ -4,13 +4,16 @@ import os.path
 import logging
 import json
 
-# Script configuration
+# List of images
+# This can be gathered via `find -f . > image-sources.txt` and a cleanup
+# TODO: Program gathering of index by searching for files in the source directory
+sources_index_path = "sources-index.txt"
+
 source_dir = "source" # will be joined with the path in the sources index file
 output_dir = "output" # will mirror the paths in the sources index file
 
-sources_index_path = "sources-index.txt"
-user_words_path = "./training-data/user.lstm-word-dawg"
 ocr_language = "spa"
+user_words_path = "./training-data/user.lstm-word-dawg"
 
 do_rotate = True
 do_text_extraction = True
@@ -21,7 +24,7 @@ do_make_human_readable = True # otherwise it will just save the "machine readabl
 logging.basicConfig(filename="output.log",level=logging.INFO,format="%(asctime)s [%(levelname)s] %(message)s")
 logging.getLogger().addHandler(logging.StreamHandler())
 
-# Build config if available
+# Build tesseract configuration if available
 tess_config = '--user-words {}'.format(user_words_path) if user_words_path else ''
 
 # Profile: Machine Readable - High Contrast
@@ -43,6 +46,7 @@ def enhance_readable(image):
 # optionally a source image can be passed to also be rotated and returned
 # if no path is specified a tmp file will be created
 def detect_and_rotate_image(enhanced_image, output_path=os.path.join(output_dir,"tmp.jpg"), source_image=None):
+    logging.info("Saving image to attempt to detect orientation...")
     enhanced_image.save(output_path)
     try:
         # ! To fix: Reopen image and read osd
@@ -86,54 +90,61 @@ def process_image(image_path):
     image_path_parts = image_path.split('/')
     image_path_source = os.path.join(source_dir,image_path)
     image_file_name = image_path_parts[-1]
-    image_exists = os.path.exists(image_path_source)
-    if (image_exists):
-        logging.info("Image {}: {}".format(count, image_path_source))
-        image = Image.open(image_path_source)
-        #
-        # build output path and directory
-        image_path_output = os.path.join(output_dir,image_path)
-        dir_path_output = os.path.join(output_dir,*image_path_parts[:-1])
-        os.makedirs(dir_path_output, exist_ok=True)
-        #
-        # enhance and save image
-        high_contrast_image = enhance_high_contrast(image)
-        # 
-        # perform rotation if requested
-        if do_rotate:
-            high_contrast_image, image = detect_and_rotate_image(high_contrast_image, image_path_output, image)
-        #
-        # read text from image
-        if do_text_extraction:
-            text_file_path = os.path.join(dir_path_output,image_file_name[:-4]+"txt")
-            extracted_text = extract_text_from_image(high_contrast_image, text_file_path)
-        #
-        # read data from image
-        if do_text_data_extraction:
-            data_file_path = os.path.join(dir_path_output,image_file_name[:-4]+"json")
-            extracted_data = extract_data_from_image(high_contrast_image, data_file_path)
-        #
-        # enhance original for readability and save as new output
-        if do_make_human_readable:
-            logging.info("Enhancing original image...")
-            image = enhance_readable(image)
-            image.save(image_path_output)
-        #
-        # final cleanup
-        high_contrast_image.close()
-        image.close()
-        logging.info("Done.")
-    else:
-        logging.warning("Image {}: {} could NOT be found.".format(count, image_path_source))
+    #
+    # validate image
+    if (not os.path.exists(image_path_source)):
+        logging.warning("Image could NOT be found.")
+        return
+    #
+    # build output path and directory
+    image_path_output = os.path.join(output_dir,image_path)
+    dir_path_output = os.path.join(output_dir,*image_path_parts[:-1])
+    os.makedirs(dir_path_output, exist_ok=True)
+    #
+    # open Image
+    logging.info("Image found...".format(image_path_source))
+    image = Image.open(image_path_source)
+    #
+    # enhance and save image
+    high_contrast_image = enhance_high_contrast(image)
+    # 
+    # perform rotation if requested
+    if do_rotate:
+        high_contrast_image, image = detect_and_rotate_image(high_contrast_image, image_path_output, image)
+    #
+    # read text from image
+    if do_text_extraction:
+        text_file_path = os.path.join(dir_path_output,image_file_name[:-4]+"txt")
+        extracted_text = extract_text_from_image(high_contrast_image, text_file_path)
+    #
+    # read data from image
+    if do_text_data_extraction:
+        data_file_path = os.path.join(dir_path_output,image_file_name[:-4]+"json")
+        extracted_data = extract_data_from_image(high_contrast_image, data_file_path)
+    #
+    # enhance original for readability and save as new output
+    if do_make_human_readable:
+        logging.info("Enhancing original image...")
+        image = enhance_readable(image)
+        image.save(image_path_output)
+    #
+    # final cleanup
+    high_contrast_image.close()
+    image.close()
+    logging.info("Done.")
 
-# Get list of images
-# This can be gathered via `find -f . > image-sources.txt` and a cleanup
-# TODO: Program gathering of index by searching for files in the source directory
-logging.info("Starting a new batch...")
-with open(sources_index_path, 'r') as sources_index_file:
-    sources_index = sources_index_file.readlines()
-    count = 0
-    # Strips the newline character
-    for sources_index_line in sources_index:
-        count += 1
-        process_image(sources_index_line.strip())
+# Process all images in index
+def process_images_index(images):
+    logging.info("Starting a new batch...")
+    with open(images, 'r') as sources_index_file:
+        sources_index = sources_index_file.readlines()
+        count = 0
+        for sources_index_line in sources_index:
+            count += 1
+            image_path = sources_index_line.strip()
+            logging.info("Image {}: {}".format(count, image_path))
+            process_image(image_path)
+
+# Call process images index by default when executing from command line
+if __name__ == '__main__':
+    process_images_index(sources_index_path)
