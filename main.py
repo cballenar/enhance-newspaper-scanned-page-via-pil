@@ -3,6 +3,7 @@ from pytesseract import Output, image_to_osd, image_to_data, image_to_string
 import os.path
 import logging
 import json
+import re
 
 # List of images
 # This can be gathered via `find -f . > image-sources.txt` and a cleanup
@@ -16,8 +17,8 @@ ocr_language = "spa"
 user_words_path = "./training-data/user.lstm-word-dawg"
 
 do_rotate = True
-do_text_extraction = True
-do_text_data_extraction = True
+do_data_extraction = True
+do_keyword_extraction = True # keywords require data extraction
 do_make_human_readable = True # otherwise it will just save the "machine readable" (high contrast grayscale) image
 
 # Configure logs
@@ -76,19 +77,35 @@ def detect_and_rotate_image(enhanced_image, output_path=os.path.join(output_dir,
         return enhanced_image, source_image
     return enhanced_image
 
-def extract_text_from_image(image, output_path=os.path.join(output_dir,"tmp.txt")):
-    logging.info("Reading string from file...")
-    with open(output_path, "w") as image_string_file:
-        extracted_text = image_to_string(image, lang=ocr_language, config=tess_config)
-        image_string_file.write(extracted_text)
-    return extracted_text
-
-def extract_data_from_image(image, output_path=os.path.join(output_dir,"tmp.json")):
+def extract_data_from_image(image, output_path=os.path.join(output_dir,"tmp_data.json")):
     logging.info("Reading data from file...")
     with open(output_path, "w") as image_data_file:
         extracted_data = image_to_data(image, lang=ocr_language, output_type=Output.DICT, config=tess_config)
         image_data_file.write(json.dumps(extracted_data))
     return extracted_data
+
+def extract_keywords_from_data(data, output_path=os.path.join(output_dir,"tmp_keywords.txt")):
+    logging.info("Reading keywords from file...")
+    # flatten texts
+    text = ' '.join(data['text'])
+    text = re.sub("[^\w ]", " ", text)
+    text = re.sub("_", " ", text)
+    text_words = text.lower().split()
+    # extract unique words
+    keywords_set = set()
+    for word in text_words:
+        # check if word contains more than 2 characters, only alpha or only numbers
+        if len(word)>1 and (re.match('^[A-Za-z]+$',word) or re.match('^[0-9]+$',word)):
+            keywords_set.add(word)
+    # cleanup set
+    keywords = list(keywords_set)
+    keywords.sort()
+    # write words to file
+    with open(output_path, "w") as image_keywords_file:
+        for word in keywords:
+            image_keywords_file.write('{}\n'.format(word))
+    # return keywords
+    return keywords
 
 # Process a Single Image from its path
 def process_image(image_path):
@@ -117,15 +134,15 @@ def process_image(image_path):
     if do_rotate:
         high_contrast_image, image = detect_and_rotate_image(high_contrast_image, image_path_output, image)
     #
-    # read text from image
-    if do_text_extraction:
-        text_file_path = os.path.join(dir_path_output,image_file_name[:-4]+".txt")
-        extracted_text = extract_text_from_image(high_contrast_image, text_file_path)
-    #
     # read data from image
-    if do_text_data_extraction:
+    if do_data_extraction:
         data_file_path = os.path.join(dir_path_output,image_file_name[:-4]+".json")
         extracted_data = extract_data_from_image(high_contrast_image, data_file_path)
+    #
+    # read keywords from image
+    if do_data_extraction and do_keyword_extraction:
+        text_file_path = os.path.join(dir_path_output,image_file_name[:-4]+".txt")
+        extracted_keywords = extract_keywords_from_data(extracted_data, text_file_path)
     #
     # enhance original for readability and save as new output
     if do_make_human_readable:
