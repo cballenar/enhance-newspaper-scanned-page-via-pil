@@ -55,6 +55,9 @@ def detect_and_rotate_image(enhanced_image, output_path=os.path.join(output_dir,
         osd_results = image_to_osd(output_path, output_type=Output.DICT)
     except Exception as e:
         logging.error(str(e))
+        if source_image:
+            return enhanced_image, source_image
+        return enhanced_image
     else:
         logging.info("Orientation: {} with a {} confidence.".format(osd_results["orientation"],osd_results["orientation_conf"]))
         # If rotation seems good, apply and resave
@@ -69,6 +72,8 @@ def detect_and_rotate_image(enhanced_image, output_path=os.path.join(output_dir,
             if source_image:
                 source_image = source_image.rotate(osd_results["orientation"], expand=1)
                 return enhanced_image, source_image
+    if source_image:
+        return enhanced_image, source_image
     return enhanced_image
 
 def extract_text_from_image(image, output_path=os.path.join(output_dir,"tmp.txt")):
@@ -114,12 +119,12 @@ def process_image(image_path):
     #
     # read text from image
     if do_text_extraction:
-        text_file_path = os.path.join(dir_path_output,image_file_name[:-4]+"txt")
+        text_file_path = os.path.join(dir_path_output,image_file_name[:-4]+".txt")
         extracted_text = extract_text_from_image(high_contrast_image, text_file_path)
     #
     # read data from image
     if do_text_data_extraction:
-        data_file_path = os.path.join(dir_path_output,image_file_name[:-4]+"json")
+        data_file_path = os.path.join(dir_path_output,image_file_name[:-4]+".json")
         extracted_data = extract_data_from_image(high_contrast_image, data_file_path)
     #
     # enhance original for readability and save as new output
