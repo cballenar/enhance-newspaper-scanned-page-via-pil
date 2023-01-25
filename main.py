@@ -1,5 +1,5 @@
 from PIL import Image, ImageOps, ImageFilter, ImageEnhance
-from pytesseract import Output, image_to_osd, image_to_data, image_to_string
+from pytesseract import Output, image_to_osd, image_to_data
 import os.path
 import logging
 import json
@@ -16,7 +16,7 @@ output_dir = "output" # will mirror the paths in the sources index file
 ocr_language = "spa"
 user_words_path = "./training-data/user.lstm-word-dawg"
 
-do_rotate = True
+do_rotate = False
 do_data_extraction = True
 do_keyword_extraction = True # keywords require data extraction
 do_make_human_readable = True # otherwise it will just save the "machine readable" (high contrast grayscale) image
@@ -77,15 +77,60 @@ def detect_and_rotate_image(enhanced_image, output_path=os.path.join(output_dir,
         return enhanced_image, source_image
     return enhanced_image
 
-def extract_data_from_image(image, output_path=os.path.join(output_dir,"tmp_data.json")):
+def extract_text_data_from_image(image, output_path=os.path.join(output_dir,"tmp_data.json")):
     logging.info("Reading data from file...")
     with open(output_path, "w") as image_data_file:
         extracted_data = image_to_data(image, lang=ocr_language, output_type=Output.DICT, config=tess_config)
         image_data_file.write(json.dumps(extracted_data))
     return extracted_data
 
+def extract_text_from_data(data, output_path=os.path.join(output_dir,"tmp_text.txt")):
+    logging.info("Extracting texts from data...")
+    # place data contents into a structured nested array format that mimics a page
+    blocks_array = []
+    for index, word in enumerate(data['text']):
+        # 
+        # check block info and add block if needed
+        block_i = data['block_num'][index]
+        if ( block_i > len(blocks_array) ): break
+        if ( block_i == len(blocks_array) ): blocks_array.append([])
+        pars_array = blocks_array[block_i]
+        # 
+        # check par info and add par if needed
+        par_i = data['par_num'][index]
+        if ( par_i > len(pars_array) ): break
+        if ( par_i == len(pars_array) ): pars_array.append([])
+        lines_array = pars_array[par_i]
+        # 
+        # check line info and add line if needed
+        line_i = data['line_num'][index]
+        if ( line_i > len(lines_array) ): break
+        if ( line_i == len(lines_array) ): lines_array.append([])
+        words_array = lines_array[line_i]
+        # 
+        # add text to line, in par, in block
+        words_array.append(word)
+    #
+    # take structured array and build a single string split into paragraphs
+    blocks = []
+    for block in blocks_array:
+        pars = []
+        for par in block:
+            lines = []
+            for line in par:
+                lines.append(' '.join(line).strip())
+            pars.append('\n'.join(lines).strip())
+        blocks.append('\n'.join(pars).strip())
+    text = '\n'.join(blocks).strip()
+    #
+    # write text to file
+    with open(output_path, "w") as image_text_file:
+        image_text_file.write(text)
+    #
+    return text
+
 def extract_keywords_from_data(data, output_path=os.path.join(output_dir,"tmp_keywords.txt")):
-    logging.info("Reading keywords from file...")
+    logging.info("Extracting keywords from data...")
     # flatten texts
     text = ' '.join(data['text'])
     text = re.sub("[^\w ]", " ", text)
@@ -122,6 +167,10 @@ def process_image(image_path):
     image_path_output = os.path.join(output_dir,image_path)
     dir_path_output = os.path.join(output_dir,*image_path_parts[:-1])
     os.makedirs(dir_path_output, exist_ok=True)
+    # 
+    # format output name of files
+    def format_file_name(extension):
+        return os.path.join(dir_path_output,image_file_name[:-4]+extension)
     #
     # open Image
     logging.info("Image found...".format(image_path_source))
@@ -136,13 +185,13 @@ def process_image(image_path):
     #
     # read data from image
     if do_data_extraction:
-        data_file_path = os.path.join(dir_path_output,image_file_name[:-4]+".json")
-        extracted_data = extract_data_from_image(high_contrast_image, data_file_path)
+        data_file_path = format_file_name(".data.json")
+        extracted_data = extract_text_data_from_image(high_contrast_image, data_file_path)
     #
     # read keywords from image
     if do_data_extraction and do_keyword_extraction:
-        text_file_path = os.path.join(dir_path_output,image_file_name[:-4]+".txt")
-        extracted_keywords = extract_keywords_from_data(extracted_data, text_file_path)
+        extracted_text = extract_text_from_data(extracted_data, format_file_name(".texts.txt"))
+        extracted_keywords = extract_keywords_from_data(extracted_data, format_file_name(".words.txt"))
     #
     # enhance original for readability and save as new output
     if do_make_human_readable:
