@@ -1,10 +1,11 @@
 from PIL import Image, ImageOps, ImageFilter, ImageEnhance
 from pytesseract import Output, image_to_osd, image_to_data
-import os.path
+import os
 import logging
 import json
 import re
 import argparse
+import sys
 
 # Initialize parser
 parser = argparse.ArgumentParser(
@@ -42,7 +43,7 @@ do_keyword_extraction   = False if args.No_Keywords     else True
 do_make_human_readable  = False if args.No_Man_Readable else True
 
 # Configure logs
-logging.basicConfig(filename="output.log",level=logging.INFO,format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(filename='{}/output.log'.format(os.path.dirname(os.path.abspath(__file__))),level=logging.INFO,format="%(asctime)s [%(levelname)s] %(message)s")
 logging.getLogger().addHandler(logging.StreamHandler())
 
 # Build tesseract configuration if available
@@ -181,6 +182,7 @@ def process_image(image_path):
     # validate image
     if (not os.path.exists(image_path_source)):
         logging.warning("Image could NOT be found.")
+        sys.exit("Image could NOT be found.")
         return
     #
     # build output path and directory
