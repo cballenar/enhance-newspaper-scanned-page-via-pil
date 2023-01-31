@@ -4,22 +4,42 @@ import os.path
 import logging
 import json
 import re
+import argparse
 
-# List of images
-# This can be gathered via `find -f . > image-sources.txt` and a cleanup
-# TODO: Program gathering of index by searching for files in the source directory
-sources_index_path = "sources-index.txt"
+# Initialize parser
+parser = argparse.ArgumentParser(
+    description = 'Enhances, rotates, and reads images of scanned archives.'
+)
 
-source_dir = "source" # will be joined with the path in the sources index file
-output_dir = "output" # will mirror the paths in the sources index file
+# Adding optional argument
+parser.add_argument("-f", "--File",     help = "Provide path to single image file to process (relative to source), e.g.: `./path/to/file.jpg`")
+parser.add_argument("-b", "--Batch",    help = "Provide path to text file containing list of files to process (absolute or relative to script), e.g.: `/full/path/to/file.txt`")
 
-ocr_language = "spa"
-user_words_path = "./training-data/user.lstm-word-dawg"
+parser.add_argument("-s", "--Source",   help = "Provide directory path where source image(s) can be found, e.g.: `/full/path/to/output/dir`. Defaults to relative path `./source`")
+parser.add_argument("-o", "--Output",   help = "Provide directory path to where output will be saved, e.g.: `/full/path/to/output/dir`. Defaults to relative path `./output`. Be careful if you're using the same output and source, the original image WILL be overwritten by either the high contrast or the human readable version of the image.")
 
-do_rotate = False
-do_data_extraction = True
-do_keyword_extraction = True # keywords require data extraction
-do_make_human_readable = True # otherwise it will just save the "machine readable" (high contrast grayscale) image
+parser.add_argument("-l", "--Language", help = "Provide language to be used by PyTesseract, e.g.: `eng`. Defaults to `spa`.")
+parser.add_argument("-w", "--Words",    help = "Provide the path to a custom dictionary to improve OCR, e.g.: `./training-data/user.lstm-word-dawg`. Defaults to none.")
+
+parser.add_argument("-r", "--No_Rotate",        action="store_true", help = "Disables Auto Rotation of images.")
+parser.add_argument("-d", "--No_Data",          action="store_true", help = "Disables image_text_data extraction and output.")
+parser.add_argument("-t", "--No_Text",          action="store_true", help = "Disables image_text output. Requires Data extraction.")
+parser.add_argument("-k", "--No_Keywords",      action="store_true", help = "Disables keyword output. Requires Data extraction.")
+parser.add_argument("-m", "--No_Man_Readable",  action="store_true", help = "Disables generation of a human readable image, and provides a version optimized for OCR.")
+
+# Read arguments from command line
+args = parser.parse_args()
+
+source_dir      = args.Source   or "source" # will be joined with the path in the sources index file
+output_dir      = args.Output   or "output" # will mirror the paths in the sources index file
+ocr_language    = args.Language or "eng"
+user_words_path = args.Words    or ""
+
+do_rotate               = False if args.No_Rotate       else True
+do_data_extraction      = False if args.No_Data         else True
+do_text_extraction      = False if args.No_Text         else True
+do_keyword_extraction   = False if args.No_Keywords     else True
+do_make_human_readable  = False if args.No_Man_Readable else True
 
 # Configure logs
 logging.basicConfig(filename="output.log",level=logging.INFO,format="%(asctime)s [%(levelname)s] %(message)s")
@@ -189,8 +209,11 @@ def process_image(image_path):
         extracted_data = extract_text_data_from_image(high_contrast_image, data_file_path)
     #
     # read keywords from image
-    if do_data_extraction and do_keyword_extraction:
+    if do_data_extraction and do_text_extraction:
         extracted_text = extract_text_from_data(extracted_data, format_file_name(".texts.txt"))
+    #
+    # read keywords from image
+    if do_data_extraction and do_keyword_extraction:
         extracted_keywords = extract_keywords_from_data(extracted_data, format_file_name(".words.txt"))
     #
     # enhance original for readability and save as new output
@@ -218,4 +241,10 @@ def process_images_index(images):
 
 # Call process images index by default when executing from command line
 if __name__ == '__main__':
-    process_images_index(sources_index_path)
+    if args.File:
+        process_image(args.File)
+    elif args.Batch:
+        # List of images
+        # This can be gathered via `find -f . > image-sources.txt` and a cleanup
+        # TODO: Program gathering of index by searching for files in the source directory
+        process_images_index(args.Batch)
